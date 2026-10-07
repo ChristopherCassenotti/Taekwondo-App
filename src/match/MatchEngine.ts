@@ -1,12 +1,20 @@
 import {
   AddScoreParams,
+  MatchConfig,
   MatchState,
 } from '../types/match';
 
 type MatchListener = (state: MatchState) => void;
 
+const DEFAULT_CONFIG: MatchConfig = {
+  totalRounds: 3,
+  roundDurationMs: 2 * 60 * 1000,
+};
+
 export class MatchEngine {
   private state: MatchState;
+
+  private config: MatchConfig;
 
   private listeners = new Set<MatchListener>();
 
@@ -16,20 +24,26 @@ export class MatchEngine {
 
   private remainingWhenStarted: number;
 
-  constructor() {
-    const roundDurationMs = 2 * 60 * 1000;
+  constructor(config: MatchConfig = DEFAULT_CONFIG) {
+    this.config = {
+      ...config,
+    };
 
-    this.remainingWhenStarted = roundDurationMs;
+    this.remainingWhenStarted =
+      this.config.roundDurationMs;
 
     this.state = {
       blueScore: 0,
       redScore: 0,
 
       round: 1,
-      totalRounds: 3,
+      totalRounds: this.config.totalRounds,
 
-      roundDurationMs,
-      remainingMs: roundDurationMs,
+      roundDurationMs:
+        this.config.roundDurationMs,
+
+      remainingMs:
+        this.config.roundDurationMs,
 
       status: 'IDLE',
     };
@@ -57,6 +71,37 @@ export class MatchEngine {
     for (const listener of this.listeners) {
       listener(state);
     }
+  }
+
+  configure(config: MatchConfig) {
+    if (
+      this.state.status !== 'IDLE' ||
+      this.state.round !== 1 ||
+      this.state.blueScore !== 0 ||
+      this.state.redScore !== 0
+    ) {
+      return false;
+    }
+
+    this.config = {
+      ...config,
+    };
+
+    this.state.totalRounds =
+      config.totalRounds;
+
+    this.state.roundDurationMs =
+      config.roundDurationMs;
+
+    this.state.remainingMs =
+      config.roundDurationMs;
+
+    this.remainingWhenStarted =
+      config.roundDurationMs;
+
+    this.emit();
+
+    return true;
   }
 
   private startTimer() {
@@ -95,7 +140,6 @@ export class MatchEngine {
 
     if (remaining <= 0) {
       this.state.remainingMs = 0;
-
       this.state.status = 'ROUND_ENDED';
 
       this.startedAt = null;
@@ -239,16 +283,19 @@ export class MatchEngine {
       redScore: 0,
 
       round: 1,
-      totalRounds: 3,
+      totalRounds: this.config.totalRounds,
 
-      roundDurationMs: 2 * 60 * 1000,
-      remainingMs: 2 * 60 * 1000,
+      roundDurationMs:
+        this.config.roundDurationMs,
+
+      remainingMs:
+        this.config.roundDurationMs,
 
       status: 'IDLE',
     };
 
     this.remainingWhenStarted =
-      this.state.remainingMs;
+      this.config.roundDurationMs;
 
     this.emit();
   }

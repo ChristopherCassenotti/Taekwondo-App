@@ -7,6 +7,11 @@ export type MatchStatus =
   | 'ROUND_ENDED'
   | 'FINISHED';
 
+export type MatchConfig = {
+  totalRounds: number;
+  roundDurationMs: number;
+};
+
 export type MatchState = {
   blueScore: number;
   redScore: number;

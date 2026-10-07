@@ -14,6 +14,22 @@ import { ScoreAction } from './types/scoring';
 import { MatchState } from './types/match';
 
 export function App() {
+
+  const [roundDurationSeconds, setRoundDurationSeconds] =
+    useState(120);
+
+  const [totalRounds, setTotalRounds] =
+    useState(3);
+
+  const [refereeCount, setRefereeCount] =
+    useState(4);
+
+  const [requiredReferees, setRequiredReferees] =
+    useState(2);
+
+  const [consensusWindowMs, setConsensusWindowMs] =
+  useState(800);
+
   const matchEngineRef =
     useRef<MatchEngine | null>(null);
 
@@ -62,22 +78,33 @@ export function App() {
 
   const processAction = useCallback(
     (action: ScoreAction) => {
+      const matchEngine = matchEngineRef.current;
+      const scoringEngine = scoringEngineRef.current;
+
+      if (!matchEngine || !scoringEngine) {
+        return;
+      }
+
+      const match = matchEngine.getState();
+
+      if (match.status !== 'RUNNING') {
+        console.log(
+          `[IGNORADO] J${action.refereeId} - luta não está rodando`,
+        );
+
+        return;
+      }
+
       setRawVotes((current) => [
         action,
         ...current.slice(0, 19),
       ]);
 
-      scoringEngineRef.current?.processVote(
-        action,
-      );
+      scoringEngine.processVote(action);
     },
     [],
   );
-
-  useGamepadEvents({
-    onAction: processAction,
-  });
-
+  
   const simulateVote = (
     refereeId: number,
     side: 'BLUE' | 'RED',
@@ -108,6 +135,83 @@ export function App() {
     .padStart(2, '0')}`;
   };
 
+  const handleStart = () => {
+    scoringEngineRef.current?.reset();
+    matchEngineRef.current?.start();
+  };
+
+  const handlePause = () => {
+    matchEngineRef.current?.pause();
+
+    scoringEngineRef.current?.reset();
+  };
+
+  const handleNextRound = () => {
+    scoringEngineRef.current?.reset();
+
+    matchEngineRef.current?.nextRound();
+  };
+
+  const handleReset = () => {
+    scoringEngineRef.current?.reset();
+    matchEngineRef.current?.reset();
+
+    setRawVotes([]);
+  };
+
+  const handleApplySettings = () => {
+  if (
+    requiredReferees >
+    refereeCount
+  ) {
+    alert(
+      'O consenso não pode exigir mais árbitros do que existem na luta.',
+    );
+
+    return;
+  }
+
+  if (requiredReferees < 1) {
+    return;
+  }
+
+  if (totalRounds < 1) {
+    return;
+  }
+
+  if (roundDurationSeconds < 1) {
+    return;
+  }
+
+  if (consensusWindowMs < 100) {
+    return;
+  }
+
+  const configured =
+    matchEngineRef.current?.configure({
+      totalRounds,
+
+      roundDurationMs:
+        roundDurationSeconds * 1000,
+    });
+
+  if (!configured) {
+    alert(
+      'As configurações só podem ser alteradas antes do início da luta.',
+    );
+
+    return;
+  }
+
+  scoringEngineRef.current?.configure({
+    requiredReferees,
+    consensusWindowMs,
+  });
+
+  alert(
+    'Configurações aplicadas.',
+  );
+ };
   return (
     <main
       style={{
@@ -121,7 +225,107 @@ export function App() {
         Round {matchState.round} de{' '}
         {matchState.totalRounds}
       </h2>
-        
+        <section
+  style={{
+    border: '1px solid #ccc',
+    padding: 20,
+    marginBottom: 30,
+  }}
+>
+  <h2>Configuração da luta</h2>
+
+  <div
+    style={{
+      display: 'grid',
+      gap: 12,
+      maxWidth: 400,
+    }}
+  >
+    <label>
+      Quantidade de rounds
+
+      <input
+        type="number"
+        min={1}
+        value={totalRounds}
+        onChange={(event) =>
+          setTotalRounds(
+            Number(event.target.value),
+          )
+        }
+      />
+    </label>
+
+    <label>
+      Duração do round (segundos)
+
+      <input
+        type="number"
+        min={1}
+        value={roundDurationSeconds}
+        onChange={(event) =>
+          setRoundDurationSeconds(
+            Number(event.target.value),
+          )
+        }
+      />
+    </label>
+
+    <label>
+      Quantidade de árbitros
+
+      <input
+        type="number"
+        min={1}
+        max={4}
+        value={refereeCount}
+        onChange={(event) =>
+          setRefereeCount(
+            Number(event.target.value),
+          )
+        }
+      />
+    </label>
+
+    <label>
+      Árbitros necessários para consenso
+
+      <input
+        type="number"
+        min={1}
+        max={refereeCount}
+        value={requiredReferees}
+        onChange={(event) =>
+          setRequiredReferees(
+            Number(event.target.value),
+          )
+        }
+      />
+    </label>
+
+    <label>
+      Janela de consenso (ms)
+
+      <input
+        type="number"
+        min={100}
+        step={50}
+        value={consensusWindowMs}
+        onChange={(event) =>
+          setConsensusWindowMs(
+            Number(event.target.value),
+          )
+        }
+      />
+    </label>
+
+    <button
+      onClick={handleApplySettings}
+    >
+      Aplicar configurações
+    </button>
+  </div>
+</section>
         <div
           style={{
             fontSize: 72,
@@ -199,38 +403,21 @@ export function App() {
           marginBottom: 30,
         }}
       >
-        <button
-          onClick={() =>
-            matchEngineRef.current?.start()
-          }
-        >
+        <button onClick={handleStart}>
           Iniciar
         </button>
 
-        <button
-          onClick={() =>
-            matchEngineRef.current?.pause()
-          }
-        >
-          Pausar
-        </button>
+        <button onClick={handlePause}>
+  Pausar
+</button>
 
-        <button
-          onClick={() =>
-            matchEngineRef.current?.nextRound()
-          }
-        >
-          Próximo round
-        </button>
+<button onClick={handleNextRound}>
+  Próximo round
+</button>
 
-        <button
-          onClick={() => {
-            matchEngineRef.current?.reset();
-            scoringEngineRef.current?.reset();
-          }}
-        >
-          Resetar luta
-        </button>
+<button onClick={handleReset}>
+  Resetar luta
+</button>
       </div>
 
       <hr />
