@@ -78,6 +78,10 @@ export function Scoreboard({
             {match.blueScore}
           </div>
 
+            <p>
+              Gam-jeom: {match.blueGamJeom}
+            </p>
+          
           <button
             onClick={onRemoveBlue}
           >
@@ -96,6 +100,10 @@ export function Scoreboard({
           >
             {match.redScore}
           </div>
+
+            <p>
+              Gam-jeom: {match.redGamJeom}
+            </p>
 
           <button
             onClick={onRemoveRed}

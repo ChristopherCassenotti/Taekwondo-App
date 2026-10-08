@@ -1,74 +1,132 @@
 import { useEffect, useRef } from 'react';
-import { ScoreAction } from '../types/scoring';
+
+import {
+  RefereeButtonMappings,
+} from '../types/controller';
+
+import {
+  AthleteSide,
+  ScoreAction,
+} from '../types/scoring';
 
 type UseGamepadEventsProps = {
-  onAction: (action: ScoreAction) => void;
+  onAction: (
+    action: ScoreAction,
+  ) => void;
 
   // gamepadIndex -> refereeId
-  assignments: Record<number, number>;
+  assignments: Record<
+    number,
+    number
+  >;
+
+  // refereeId -> configuração dos botões
+  buttonMappings: RefereeButtonMappings;
 };
 
-const buttonMapping: Record<
-  number,
-  {
-    side: 'BLUE' | 'RED';
-    points: number;
+type ResolvedAction = {
+  side: AthleteSide;
+  points: number;
+};
+
+function resolveButtonAction(
+  buttonIndex: number,
+  mapping:
+    | RefereeButtonMappings[number]
+    | undefined,
+): ResolvedAction | null {
+  if (!mapping) {
+    return null;
   }
-> = {
-  0: {
-    side: 'BLUE',
-    points: 2,
-  },
 
-  1: {
-    side: 'BLUE',
-    points: 3,
-  },
+  if (
+    buttonIndex === mapping.blue2
+  ) {
+    return {
+      side: 'BLUE',
+      points: 2,
+    };
+  }
 
-  2: {
-    side: 'RED',
-    points: 2,
-  },
+  if (
+    buttonIndex === mapping.blue3
+  ) {
+    return {
+      side: 'BLUE',
+      points: 3,
+    };
+  }
 
-  3: {
-    side: 'RED',
-    points: 3,
-  },
-};
+  if (
+    buttonIndex === mapping.red2
+  ) {
+    return {
+      side: 'RED',
+      points: 2,
+    };
+  }
+
+  if (
+    buttonIndex === mapping.red3
+  ) {
+    return {
+      side: 'RED',
+      points: 3,
+    };
+  }
+
+  return null;
+}
 
 export function useGamepadEvents({
   onAction,
   assignments,
+  buttonMappings,
 }: UseGamepadEventsProps) {
   const previousButtons =
-    useRef<Record<string, boolean>>({});
+    useRef<
+      Record<string, boolean>
+    >({});
 
   useEffect(() => {
-    let animationFrame: number;
+    let animationFrame = 0;
 
     const readGamepads = () => {
       const gamepads =
         navigator.getGamepads();
 
-      for (const gamepad of gamepads) {
-        if (!gamepad) continue;
+      for (
+        const gamepad of gamepads
+      ) {
+        if (!gamepad) {
+          continue;
+        }
 
         const refereeId =
-          assignments[gamepad.index];
+          assignments[
+            gamepad.index
+          ];
 
-        // Controle conectado, mas ainda
-        // não associado a nenhum árbitro.
         if (!refereeId) {
           continue;
         }
 
+        const mapping =
+          buttonMappings[
+            refereeId
+          ];
+
         gamepad.buttons.forEach(
-          (button, buttonIndex) => {
+          (
+            button,
+            buttonIndex,
+          ) => {
             const key =
               `${gamepad.index}-${buttonIndex}`;
 
             const wasPressed =
-              previousButtons.current[key] ??
+              previousButtons
+                .current[key] ??
               false;
 
             const isPressed =
@@ -78,17 +136,25 @@ export function useGamepadEvents({
               isPressed &&
               !wasPressed
             ) {
-              const mapping =
-                buttonMapping[
-                  buttonIndex
-                ];
+              const action =
+                resolveButtonAction(
+                  buttonIndex,
+                  mapping,
+                );
 
-              if (mapping) {
+              if (action) {
                 onAction({
                   refereeId,
-                  side: mapping.side,
-                  points: mapping.points,
-                  button: buttonIndex,
+
+                  side:
+                    action.side,
+
+                  points:
+                    action.points,
+
+                  button:
+                    buttonIndex,
+
                   timestamp:
                     performance.now(),
                 });
@@ -115,5 +181,9 @@ export function useGamepadEvents({
         animationFrame,
       );
     };
-  }, [onAction, assignments]);
+  }, [
+    onAction,
+    assignments,
+    buttonMappings,
+  ]);
 }

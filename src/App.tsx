@@ -6,9 +6,18 @@ import {
   useState,
 } from 'react';
 
+import { PenaltyControls } from './components/match/PenaltyControls';
+
 import { ControllerSettings } from './components/controllers/ControllerSettings';
 
-import { ControllerAssignment } from './types/controller';
+import {
+  ButtonMappingTarget,
+  ControllerAssignment,
+  RefereeButtonAction,
+  RefereeButtonMappings,
+} from './types/controller';
+
+import { ButtonMappingSettings } from './components/controllers/ButtonMappingSettings';
 
 import { MatchControls } from './components/match/MatchControls';
 import { MatchSettings } from './components/match/MatchSettings';
@@ -311,6 +320,60 @@ useEffect(() => {
   assigningRefereeId,
   controllerAssignments,
 ]);
+
+const [
+  buttonMappings,
+  setButtonMappings,
+] = useState<RefereeButtonMappings>({
+  1: {
+    blue2: 0,
+    blue3: 1,
+    red2: 2,
+    red3: 3,
+  },
+
+  2: {
+    blue2: 0,
+    blue3: 1,
+    red2: 2,
+    red3: 3,
+  },
+
+  3: {
+    blue2: 0,
+    blue3: 1,
+    red2: 2,
+    red3: 3,
+  },
+
+  4: {
+    blue2: 0,
+    blue3: 1,
+    red2: 2,
+    red3: 3,
+  },
+});
+
+const [
+  buttonMappingTarget,
+  setButtonMappingTarget,
+] = useState<ButtonMappingTarget | null>(
+  null,
+);
+
+const [
+  buttonMappingError,
+  setButtonMappingError,
+] = useState<string | null>(
+  null,
+);
+
+const buttonMappingPreviousButtons =
+  useRef<
+    Record<string, boolean>
+  >({});
+
+
 const gamepadAssignments =
   useMemo(() => {
     const result: Record<
@@ -503,10 +566,13 @@ const gamepadAssignments =
    */
 
 useGamepadEvents({
-  onAction: processAction,
+  onAction:
+    processAction,
 
   assignments:
     gamepadAssignments,
+
+  buttonMappings,
 });
 
   /*
@@ -709,6 +775,235 @@ useGamepadEvents({
     matchState.redScore !==
       0;
 
+  const startButtonMapping = (
+  refereeId: number,
+  action: RefereeButtonAction,
+) => {
+  const assignment =
+    controllerAssignments[
+      refereeId
+    ];
+
+  if (!assignment) {
+    setButtonMappingError(
+      'Configure o controle deste árbitro primeiro.',
+    );
+
+    return;
+  }
+
+  const gamepad =
+    navigator.getGamepads()[
+      assignment.gamepadIndex
+    ];
+
+  if (!gamepad) {
+    setButtonMappingError(
+      'O controle deste árbitro está desconectado.',
+    );
+
+    return;
+  }
+
+  const snapshot: Record<
+    string,
+    boolean
+  > = {};
+
+  gamepad.buttons.forEach(
+    (button, buttonIndex) => {
+      snapshot[
+        `${gamepad.index}-${buttonIndex}`
+      ] = button.pressed;
+    },
+  );
+
+  buttonMappingPreviousButtons.current =
+    snapshot;
+
+  setButtonMappingError(null);
+
+  setButtonMappingTarget({
+    refereeId,
+    action,
+  });
+};
+
+useEffect(() => {
+  if (!buttonMappingTarget) {
+    return;
+  }
+
+  let animationFrame = 0;
+
+  const detectButton = () => {
+    const {
+      refereeId,
+      action,
+    } = buttonMappingTarget;
+
+    const assignment =
+      controllerAssignments[
+        refereeId
+      ];
+
+    if (!assignment) {
+      setButtonMappingError(
+        'O controle não está mais configurado.',
+      );
+
+      setButtonMappingTarget(
+        null,
+      );
+
+      return;
+    }
+
+    const gamepad =
+      navigator.getGamepads()[
+        assignment.gamepadIndex
+      ];
+
+    if (!gamepad) {
+      setButtonMappingError(
+        'O controle foi desconectado.',
+      );
+
+      setButtonMappingTarget(
+        null,
+      );
+
+      return;
+    }
+
+    for (
+      let buttonIndex = 0;
+      buttonIndex <
+      gamepad.buttons.length;
+      buttonIndex++
+    ) {
+      const button =
+        gamepad.buttons[
+          buttonIndex
+        ];
+
+      const key =
+        `${gamepad.index}-${buttonIndex}`;
+
+      const wasPressed =
+        buttonMappingPreviousButtons
+          .current[key] ??
+        false;
+
+      if (
+        button.pressed &&
+        !wasPressed
+      ) {
+        const currentMapping =
+          buttonMappings[
+            refereeId
+          ];
+
+        const duplicate =
+          Object.entries(
+            currentMapping,
+          ).find(
+            ([
+              mappingAction,
+              mappedButton,
+            ]) =>
+              mappedButton ===
+                buttonIndex &&
+              mappingAction !==
+                action,
+          );
+
+        if (duplicate) {
+          setButtonMappingError(
+            `O botão ${buttonIndex} já está sendo utilizado por outra ação deste árbitro.`,
+          );
+
+          setButtonMappingTarget(
+            null,
+          );
+
+          return;
+        }
+
+        setButtonMappings(
+          (current) => ({
+            ...current,
+
+            [refereeId]: {
+              ...current[
+                refereeId
+              ],
+
+              [action]:
+                buttonIndex,
+            },
+          }),
+        );
+
+        setButtonMappingError(
+          null,
+        );
+
+        setButtonMappingTarget(
+          null,
+        );
+
+        return;
+      }
+
+      buttonMappingPreviousButtons.current[
+        key
+      ] = button.pressed;
+    }
+
+    animationFrame =
+      requestAnimationFrame(
+        detectButton,
+      );
+  };
+
+  detectButton();
+
+  return () => {
+    cancelAnimationFrame(
+      animationFrame,
+    );
+  };
+}, [
+  buttonMappingTarget,
+  buttonMappings,
+  controllerAssignments,
+]);
+
+const handleAddBlueGamJeom = () => {
+  matchEngineRef.current?.addGamJeom(
+    'BLUE',
+  );
+};
+
+const handleRemoveBlueGamJeom = () => {
+  matchEngineRef.current?.removeGamJeom(
+    'BLUE',
+  );
+};
+
+const handleAddRedGamJeom = () => {
+  matchEngineRef.current?.addGamJeom(
+    'RED',
+  );
+};
+
+const handleRemoveRedGamJeom = () => {
+  matchEngineRef.current?.removeGamJeom(
+    'RED',
+  );
+};
+
   return (
     <main
       style={{
@@ -764,6 +1059,41 @@ useGamepadEvents({
     startControllerAssignment
   }
 />
+
+<ButtonMappingSettings
+  refereeCount={
+    settings.refereeCount
+  }
+
+  assignments={
+    controllerAssignments
+  }
+
+  connectedGamepads={
+    connectedGamepads
+  }
+
+  mappings={
+    buttonMappings
+  }
+
+  configuring={
+    buttonMappingTarget
+  }
+
+  error={
+    buttonMappingError
+  }
+
+  disabled={
+    settingsLocked
+  }
+
+  onConfigure={
+    startButtonMapping
+  }
+/>
+
       <Scoreboard
         match={matchState}
         onRemoveBlue={
@@ -773,6 +1103,37 @@ useGamepadEvents({
           handleRemoveRed
         }
       />
+
+      <PenaltyControls
+  blueGamJeom={
+    matchState.blueGamJeom
+  }
+
+  redGamJeom={
+    matchState.redGamJeom
+  }
+
+  disabled={
+    matchState.status !== 'RUNNING' &&
+    matchState.status !== 'PAUSED'
+  }
+
+  onAddBlue={
+    handleAddBlueGamJeom
+  }
+
+  onRemoveBlue={
+    handleRemoveBlueGamJeom
+  }
+
+  onAddRed={
+    handleAddRedGamJeom
+  }
+
+  onRemoveRed={
+    handleRemoveRedGamJeom
+  }
+/>
 
       <MatchControls
         status={

@@ -32,9 +32,12 @@ export class MatchEngine {
     this.remainingWhenStarted =
       this.config.roundDurationMs;
 
-    this.state = {
-      blueScore: 0,
-      redScore: 0,
+this.state = {
+  blueScore: 0,
+  redScore: 0,
+
+  blueGamJeom: 0,
+  redGamJeom: 0,
 
       round: 1,
       totalRounds: this.config.totalRounds,
@@ -278,9 +281,12 @@ export class MatchEngine {
 
     this.startedAt = null;
 
-    this.state = {
-      blueScore: 0,
-      redScore: 0,
+this.state = {
+  blueScore: 0,
+  redScore: 0,
+
+  blueGamJeom: 0,
+  redGamJeom: 0,
 
       round: 1,
       totalRounds: this.config.totalRounds,
@@ -299,4 +305,52 @@ export class MatchEngine {
 
     this.emit();
   }
+
+  addGamJeom(side: 'BLUE' | 'RED') {
+  if (side === 'BLUE') {
+    this.state.blueGamJeom += 1;
+
+    // Penalidade do azul
+    // concede 1 ponto ao vermelho.
+    this.state.redScore += 1;
+  }
+
+  if (side === 'RED') {
+    this.state.redGamJeom += 1;
+
+    // Penalidade do vermelho
+    // concede 1 ponto ao azul.
+    this.state.blueScore += 1;
+  }
+
+  this.emit();
+}
+
+removeGamJeom(side: 'BLUE' | 'RED') {
+  if (
+    side === 'BLUE' &&
+    this.state.blueGamJeom > 0
+  ) {
+    this.state.blueGamJeom -= 1;
+
+    this.state.redScore = Math.max(
+      0,
+      this.state.redScore - 1,
+    );
+  }
+
+  if (
+    side === 'RED' &&
+    this.state.redGamJeom > 0
+  ) {
+    this.state.redGamJeom -= 1;
+
+    this.state.blueScore = Math.max(
+      0,
+      this.state.blueScore - 1,
+    );
+  }
+
+  this.emit();
+}
 }

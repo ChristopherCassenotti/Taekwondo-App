@@ -16,6 +16,9 @@ export type MatchState = {
   blueScore: number;
   redScore: number;
 
+  blueGamJeom: number;
+  redGamJeom: number;
+
   round: number;
   totalRounds: number;
 
